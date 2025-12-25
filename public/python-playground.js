@@ -1,31 +1,3 @@
-import * as path from 'node:path';
-import { defineConfig } from 'rspress/config';
-import { remarkPythonPlayground } from './plugins/remarkPythonPlayground';
-
-export default defineConfig({
-  root: path.join(__dirname, 'docs'),
-  title: 'My Site',
-  icon: '/rspress-icon.png',
-  logo: {
-    light: '/rspress-light-logo.png',
-    dark: '/rspress-dark-logo.png',
-  }, 
-  markdown: {
-    remarkPlugins: [remarkPythonPlayground],
-  },
-  
-  head: [
-    [
-      'script',
-      {
-        src: 'https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js',
-        async: true,
-      },
-    ],
-    [
-      'script',
-      {},
-      `
 (function() {
   let pyodide = null;
   let loadingPromise = null;
@@ -34,6 +6,7 @@ export default defineConfig({
     if (loadingPromise) return loadingPromise;
     
     loadingPromise = (async () => {
+      // Wait for pyodide to be available
       while (typeof window.loadPyodide === 'undefined') {
         await new Promise(resolve => setTimeout(resolve, 100));
       }
@@ -61,14 +34,29 @@ export default defineConfig({
       
       const code = decodeHtml(playground.dataset.code || '');
       
+      // Create UI
       const container = document.createElement('div');
       container.style.marginBottom = '20px';
       
       const textarea = document.createElement('textarea');
       textarea.value = code;
       textarea.spellcheck = false;
-      textarea.style.cssText = 'width: 100%; min-height: 200px; background: #282c34; color: #abb2bf; padding: 15px; border-radius: 4px; border: 1px solid #3e4451; font-size: 14px; font-family: Monaco, Menlo, "Ubuntu Mono", Consolas, monospace; resize: vertical; line-height: 1.5; tab-size: 4;';
+      textarea.style.cssText = `
+        width: 100%;
+        min-height: 200px;
+        background: #282c34;
+        color: #abb2bf;
+        padding: 15px;
+        border-radius: 4px;
+        border: 1px solid #3e4451;
+        font-size: 14px;
+        font-family: Monaco, Menlo, "Ubuntu Mono", Consolas, monospace;
+        resize: vertical;
+        line-height: 1.5;
+        tab-size: 4;
+      `;
       
+      // Handle Tab key
       textarea.addEventListener('keydown', (e) => {
         if (e.key === 'Tab') {
           e.preventDefault();
@@ -84,14 +72,43 @@ export default defineConfig({
       
       const runButton = document.createElement('button');
       runButton.textContent = '▶ Run Code';
-      runButton.style.cssText = 'padding: 8px 16px; background-color: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold;';
+      runButton.style.cssText = `
+        padding: 8px 16px;
+        background-color: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: bold;
+      `;
       
       const resetButton = document.createElement('button');
       resetButton.textContent = '↺ Reset';
-      resetButton.style.cssText = 'padding: 8px 16px; background-color: #666; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px; font-weight: bold;';
+      resetButton.style.cssText = `
+        padding: 8px 16px;
+        background-color: #666;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: bold;
+      `;
       
       const output = document.createElement('pre');
-      output.style.cssText = 'display: none; background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; margin-top: 10px; overflow: auto; font-size: 14px; font-family: Monaco, Menlo, "Ubuntu Mono", Consolas, monospace; white-space: pre-wrap;';
+      output.style.cssText = `
+        display: none;
+        background: #1e1e1e;
+        color: #d4d4d4;
+        padding: 15px;
+        border-radius: 4px;
+        margin-top: 10px;
+        overflow: auto;
+        font-size: 14px;
+        font-family: Monaco, Menlo, "Ubuntu Mono", Consolas, monospace;
+        white-space: pre-wrap;
+      `;
       
       runButton.addEventListener('click', async () => {
         runButton.disabled = true;
@@ -101,12 +118,19 @@ export default defineConfig({
         
         try {
           const py = await initPyodide();
-          await py.runPythonAsync('import sys\\nfrom io import StringIO\\nsys.stdout = StringIO()');
+          
+          await py.runPythonAsync(`
+import sys
+from io import StringIO
+sys.stdout = StringIO()
+          `);
+          
           await py.runPythonAsync(textarea.value);
+          
           const stdout = await py.runPythonAsync('sys.stdout.getvalue()');
           output.textContent = stdout || '(No output)';
         } catch (err) {
-          output.textContent = 'Error: ' + err.message;
+          output.textContent = `Error: ${err.message}`;
         } finally {
           runButton.disabled = false;
           runButton.textContent = '▶ Run Code';
@@ -120,39 +144,29 @@ export default defineConfig({
       
       buttonContainer.appendChild(runButton);
       buttonContainer.appendChild(resetButton);
+      
       container.appendChild(textarea);
       container.appendChild(buttonContainer);
       container.appendChild(output);
+      
       playground.parentNode.replaceChild(container, playground);
     });
   }
 
+  // Run on load
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', setupPlaygrounds);
   } else {
     setupPlaygrounds();
   }
 
-  const observer = new MutationObserver(setupPlaygrounds);
-  observer.observe(document.body, { childList: true, subtree: true });
+  // Watch for dynamic content (for SPAs)
+  const observer = new MutationObserver(() => {
+    setupPlaygrounds();
+  });
+  
+  observer.observe(document.body, {
+    childList: true,
+    subtree: true
+  });
 })();
-      `
-    ],
-  ],
-  themeConfig: {
-    socialLinks: [
-      {
-        icon: 'github',
-        mode: 'link',
-        content: 'https://github.com/web-infra-dev/rspress',
-      },
-    ],
-  }, 
-});
-
-
-
-
-
-
-

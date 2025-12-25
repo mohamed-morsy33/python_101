@@ -8,7 +8,9 @@
     "preview": "rspress preview"
   },
   "dependencies": {
-    "rspress": "^1.40.2"
+    "hast-util-to-html": "^9.0.5",
+    "rspress": "^1.40.2",
+    "unist-util-visit": "^5.0.0"
   },
   "devDependencies": {
     "@types/node": "^18.11.17"
